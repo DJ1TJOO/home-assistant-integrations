@@ -27,7 +27,7 @@ class EetlijstCalendarEntity(EetlijstBaseEntity, CalendarEntity):
     """Representation of an Eetlijst Calendar."""
 
     _attr_name = "Calendar"
-    _attr_icon = "mdi:calendar-cutlery"
+    _attr_icon = "mdi:calendar"
 
     def __init__(self, coordinator: EetlijstCoordinator, group_id: str) -> None:
         """Initialize calendar entity."""
