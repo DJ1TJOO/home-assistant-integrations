@@ -29,5 +29,5 @@ class EetlijstBaseEntity(CoordinatorEntity[EetlijstCoordinator]):
             identifiers={(DOMAIN, self._group_id)},
             name=f"Eetlijst {group_name}",
             manufacturer="Eetlijst",
-            model="Group Management",
+            model="v5",
         )
