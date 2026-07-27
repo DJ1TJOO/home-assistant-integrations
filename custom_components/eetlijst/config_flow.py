@@ -1,5 +1,6 @@
 """Config flow for Eetlijst integration."""
 
+import asyncio
 import logging
 from collections.abc import Mapping
 from typing import Any, override
@@ -40,12 +41,15 @@ async def _validate_input(
     hass: HomeAssistant,
     data: dict[str, Any],
 ) -> None:
-    """Validate user input allows us to connect."""
+    """Validate user input allows us to connect and group exists."""
     client = Eetlijst(
         api_key=data[CONF_API_TOKEN],
         http_client=get_async_client(hass),
     )
-    await client.me.get()
+
+    async with asyncio.timeout(10):
+        await client.me.get()
+        await client.groups.get(group_id=data[CONF_GROUP_ID], include_users=False)
 
 
 class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -122,6 +126,8 @@ class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
         except httpx.HTTPStatusError as err:
             if err.response.status_code in (401, 403):
                 errors["base"] = "invalid_auth"
+            elif err.response.status_code == 404:
+                errors["base"] = "group_not_found"
             else:
                 errors["base"] = "cannot_connect"
         except httpx.RequestError, TimeoutError:

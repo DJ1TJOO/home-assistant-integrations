@@ -1,5 +1,6 @@
 """Coordinator for Eetlijst integration."""
 
+import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
 from logging import getLogger
@@ -107,23 +108,31 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
         )
 
         try:
-            group = await self.client.groups.get(group_id=group_id, include_users=True)
-            events = await self.client.events.all(
-                group_id,
-                where=where_filter,
-                limit=limit,
-                include_attendees=True,
-            )
-            shopping_items = await self.client.groups.list.items(
-                group_id=group_id,
-                where=eetschema_list_bool_exp(active={"_eq": True}),
-            )
+            async with asyncio.timeout(15):
+                group, events, shopping_items = await asyncio.gather(
+                    self.client.groups.get(group_id=group_id, include_users=True),
+                    self.client.events.all(
+                        group_id,
+                        where=where_filter,
+                        limit=limit,
+                        include_attendees=True,
+                    ),
+                    self.client.groups.list.items(
+                        group_id=group_id,
+                        where=eetschema_list_bool_exp(active={"_eq": True}),
+                    ),
+                )
 
             return EetlijstData(
                 group=group,
                 events=events,
                 shopping_items=shopping_items,
             )
+
+        except TimeoutError as err:
+            raise UpdateFailed(
+                f"Timeout fetching Eetlijst data for group {group_id}"
+            ) from err
 
         except httpx.HTTPStatusError as err:
             if err.response.status_code in (401, 403):
@@ -132,7 +141,7 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
                 ) from err
             raise UpdateFailed(f"HTTP error fetching Eetlijst data: {err}") from err
 
-        except (httpx.RequestError, TimeoutError) as err:
+        except httpx.RequestError as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err
 
         except Exception as err:
