@@ -1,0 +1,13 @@
+{
+  "domain": "eetlijst",
+  "name": "Eetlijst",
+  "codeowners": [
+    "@DJ1TJOO"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/DJ1TJOO/home-assistant-integrations/custom_components/eetlijst",
+  "requirements": [
+    "eetlijst-python>=0.0.6"
+  ],
+  "version": "0.0.1"
+}
