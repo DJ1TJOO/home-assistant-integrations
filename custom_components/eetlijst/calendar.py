@@ -28,22 +28,22 @@ class EetlijstCalendarEntity(CoordinatorEntity[EetlijstCoordinator], CalendarEnt
 
     _attr_has_entity_name = True
     _attr_name = "Calendar"
+    _attr_icon = "mdi:calendar-cutlery"
 
     def __init__(self, coordinator: EetlijstCoordinator, group_id: str) -> None:
         """Initialize calendar entity."""
         super().__init__(coordinator)
         self._group_id = group_id
-        self._attr_unique_id = f"{group_id}_calendar"
+        self._attr_unique_id = f"eetlijst_{group_id}_calendar"
 
     @property
     def event(self) -> CalendarEvent | None:
-        """Return the next upcoming event (ignoring past historical events)."""
-        if not self.coordinator.data:
+        """Return the next upcoming event."""
+        if not self.coordinator.data or not self.coordinator.data.events:
             return None
 
         now = dt_util.now()
-        # Find the earliest event that ends in the future or is happening now
-        for event in self.coordinator.data:
+        for event in self.coordinator.data.events:
             event_end = event.start_date + timedelta(hours=1)
             if event_end >= now:
                 return self._to_calendar_event(event)
@@ -53,8 +53,10 @@ class EetlijstCalendarEntity(CoordinatorEntity[EetlijstCoordinator], CalendarEnt
     async def async_get_events(
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[CalendarEvent]:
-        """Return calendar events within a datetime range for UI views."""
-        events: list[Event] = self.coordinator.data or []
+        """Return calendar events within a datetime range."""
+        events: list[Event] = (
+            self.coordinator.data.events if self.coordinator.data else []
+        )
 
         return [
             self._to_calendar_event(evt)

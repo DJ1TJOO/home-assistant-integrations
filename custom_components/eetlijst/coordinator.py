@@ -1,13 +1,20 @@
 """Coordinator for Eetlijst integration."""
 
+from dataclasses import dataclass
 from datetime import timedelta
 from logging import getLogger
 from typing import override
 
 import httpx
 from eetlijst_py import Eetlijst
-from eetlijst_py.generated import eetschema_event_bool_exp, timestamptz_comparison_exp
+from eetlijst_py.generated import (
+    ItemFields,
+    eetschema_event_bool_exp,
+    eetschema_list_bool_exp,
+    timestamptz_comparison_exp,
+)
 from eetlijst_py.services.events.transformers import Event
+from eetlijst_py.services.groups.transformers import GroupResult
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_TOKEN
 from homeassistant.core import HomeAssistant
@@ -31,8 +38,17 @@ _LOGGER = getLogger(__name__)
 type EetlijstConfigEntry = ConfigEntry[EetlijstCoordinator]
 
 
-class EetlijstCoordinator(DataUpdateCoordinator[list[Event]]):
-    """Coordinates Eetlijst event updates."""
+@dataclass
+class EetlijstData:
+    """Dataclass storing all fetched data for an Eetlijst group."""
+
+    group: GroupResult
+    events: list[Event]
+    shopping_items: list[ItemFields]
+
+
+class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
+    """Coordinates Eetlijst event, group, and todo updates."""
 
     config_entry: EetlijstConfigEntry
     client: Eetlijst
@@ -60,8 +76,8 @@ class EetlijstCoordinator(DataUpdateCoordinator[list[Event]]):
         )
 
     @override
-    async def _async_update_data(self) -> list[Event]:
-        """Fetch events using configured days back filter and limit."""
+    async def _async_update_data(self) -> EetlijstData:
+        """Fetch group info, events, and shopping list items."""
         group_id: str = self.config_entry.data[CONF_GROUP_ID]
 
         previous_days: int = self.config_entry.options.get(
@@ -84,18 +100,29 @@ class EetlijstCoordinator(DataUpdateCoordinator[list[Event]]):
             )
 
         _LOGGER.debug(
-            "Fetching Eetlijst events for group %s (previous_days=%s, limit=%s)",
+            "Fetching Eetlijst data for group %s (previous_days=%s, limit=%s)",
             group_id,
             previous_days,
             limit,
         )
 
         try:
-            return await self.client.events.all(
+            group = await self.client.groups.get(group_id=group_id, include_users=True)
+            events = await self.client.events.all(
                 group_id,
                 where=where_filter,
                 limit=limit,
                 include_attendees=True,
+            )
+            shopping_items = await self.client.groups.list.items(
+                group_id=group_id,
+                where=eetschema_list_bool_exp(active={"_eq": True}),
+            )
+
+            return EetlijstData(
+                group=group,
+                events=events,
+                shopping_items=shopping_items,
             )
 
         except httpx.HTTPStatusError as err:
@@ -103,7 +130,7 @@ class EetlijstCoordinator(DataUpdateCoordinator[list[Event]]):
                 raise ConfigEntryAuthFailed(
                     "Invalid API token or unauthorized"
                 ) from err
-            raise UpdateFailed(f"HTTP error fetching Eetlijst events: {err}") from err
+            raise UpdateFailed(f"HTTP error fetching Eetlijst data: {err}") from err
 
         except (httpx.RequestError, TimeoutError) as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err

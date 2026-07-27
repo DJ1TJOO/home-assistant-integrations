@@ -4,11 +4,13 @@ from typing import TypedDict
 
 from eetlijst_py.generated import AttendanceStatus
 from eetlijst_py.services.events.transformers import Event
+from homeassistant.util import dt as dt_util
 
 
 class AttendeeDetail(TypedDict):
     """Structured details for an individual attendee."""
 
+    user_id: str | None
     username: str
     status: str
     number_guests: int
@@ -28,6 +30,18 @@ class AttendanceSummary(TypedDict):
     attendee_names: list[str]
 
 
+def get_today_event(events: list[Event] | None) -> Event | None:
+    """Find today's event from a list of events."""
+    if not events:
+        return None
+
+    today = dt_util.now().date()
+    for event in events:
+        if event.start_date.date() == today:
+            return event
+    return None
+
+
 def parse_attendance_info(event: Event) -> AttendanceSummary:
     """Extract structured attendance attributes from a typed Event."""
     attendees = event.attendees or []
@@ -38,10 +52,12 @@ def parse_attendance_info(event: Event) -> AttendanceSummary:
     attendee_names: list[str] = []
 
     for attendee in attendees:
-        # Extract username from the nested AttendanceFieldsUserInGroupUser model
+        # Extract user_id and username from the nested user model
         username = "Unknown"
+        user_id = None
         if attendee.user and attendee.user.user:
             username = attendee.user.user.name
+            user_id = str(attendee.user.user.id)
 
         status = attendee.status
 
@@ -57,6 +73,7 @@ def parse_attendance_info(event: Event) -> AttendanceSummary:
             attendee_names.append(username)
             eating_members.append(
                 {
+                    "user_id": user_id,
                     "username": username,
                     "status": status.value,
                     "number_guests": attendee.number_guests,
