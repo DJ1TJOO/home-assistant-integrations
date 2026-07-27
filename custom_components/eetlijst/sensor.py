@@ -6,9 +6,9 @@ from eetlijst_py.services.events.transformers import Event
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import EetlijstConfigEntry, EetlijstCoordinator
+from .device import EetlijstBaseEntity
 from .helpers import get_today_event, parse_attendance_info
 
 
@@ -34,17 +34,15 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class EetlijstGroupSensor(CoordinatorEntity[EetlijstCoordinator], SensorEntity):
+class EetlijstGroupSensor(EetlijstBaseEntity, SensorEntity):
     """Sensor for group metadata and noticeboard."""
 
-    _attr_has_entity_name = True
     _attr_name = "Group"
     _attr_icon = "mdi:home-group"
 
     def __init__(self, coordinator: EetlijstCoordinator, group_id: str) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator)
-        self._group_id = group_id
+        super().__init__(coordinator, group_id)
         self._attr_unique_id = f"eetlijst_{group_id}_info"
 
     @property
@@ -84,17 +82,15 @@ class EetlijstGroupSensor(CoordinatorEntity[EetlijstCoordinator], SensorEntity):
         }
 
 
-class EetlijstEventTodaySensor(CoordinatorEntity[EetlijstCoordinator], SensorEntity):
+class EetlijstEventTodaySensor(EetlijstBaseEntity, SensorEntity):
     """Sensor indicating today's headcount and meal summary."""
 
-    _attr_has_entity_name = True
     _attr_name = "Today Event"
     _attr_icon = "mdi:pot-steam"
 
     def __init__(self, coordinator: EetlijstCoordinator, group_id: str) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator)
-        self._group_id = group_id
+        super().__init__(coordinator, group_id)
         self._attr_unique_id = f"eetlijst_{group_id}_today_event"
 
     @property
@@ -145,17 +141,14 @@ class EetlijstEventTodaySensor(CoordinatorEntity[EetlijstCoordinator], SensorEnt
         }
 
 
-class EetlijstMemberSensor(CoordinatorEntity[EetlijstCoordinator], SensorEntity):
+class EetlijstMemberSensor(EetlijstBaseEntity, SensorEntity):
     """Sensor representing an individual group member's status for today's event."""
-
-    _attr_has_entity_name = True
 
     def __init__(
         self, coordinator: EetlijstCoordinator, group_id: str, user: Any
     ) -> None:
         """Initialize member sensor."""
-        super().__init__(coordinator)
-        self._group_id = group_id
+        super().__init__(coordinator, group_id)
         self._user = user
         self._attr_name = user.name
         self._attr_unique_id = f"eetlijst_{group_id}_member_{user.id}"

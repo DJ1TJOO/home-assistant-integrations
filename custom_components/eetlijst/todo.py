@@ -9,9 +9,9 @@ from homeassistant.components.todo import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import EetlijstConfigEntry, EetlijstCoordinator
+from .device import EetlijstBaseEntity
 
 
 async def async_setup_entry(
@@ -24,10 +24,9 @@ async def async_setup_entry(
     async_add_entities([EetlijstTodoListEntity(coordinator, entry.data["group_id"])])
 
 
-class EetlijstTodoListEntity(CoordinatorEntity[EetlijstCoordinator], TodoListEntity):
+class EetlijstTodoListEntity(EetlijstBaseEntity, TodoListEntity):
     """Representation of an Eetlijst Shopping List entity."""
 
-    _attr_has_entity_name = True
     _attr_name = "Shopping List"
     _attr_supported_features = (
         TodoListEntityFeature.CREATE_TODO_ITEM
@@ -37,8 +36,7 @@ class EetlijstTodoListEntity(CoordinatorEntity[EetlijstCoordinator], TodoListEnt
 
     def __init__(self, coordinator: EetlijstCoordinator, group_id: str) -> None:
         """Initialize the todo list entity."""
-        super().__init__(coordinator)
-        self._group_id = group_id
+        super().__init__(coordinator, group_id)
         self._attr_unique_id = f"eetlijst_{group_id}_shopping_list"
 
     @property

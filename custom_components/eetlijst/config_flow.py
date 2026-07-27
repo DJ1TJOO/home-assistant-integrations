@@ -8,6 +8,7 @@ from typing import Any, override
 import httpx
 import voluptuous as vol
 from eetlijst_py import Eetlijst
+from eetlijst_py.services.groups.transformers import GroupResult
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_API_TOKEN
 from homeassistant.core import HomeAssistant
@@ -40,8 +41,8 @@ DATA_SCHEMA = vol.Schema(
 async def _validate_input(
     hass: HomeAssistant,
     data: dict[str, Any],
-) -> None:
-    """Validate user input allows us to connect and group exists."""
+) -> GroupResult:
+    """Validate user input allows us to connect and return the group object."""
     client = Eetlijst(
         api_key=data[CONF_API_TOKEN],
         http_client=get_async_client(hass),
@@ -49,7 +50,10 @@ async def _validate_input(
 
     async with asyncio.timeout(10):
         await client.me.get()
-        await client.groups.get(group_id=data[CONF_GROUP_ID], include_users=False)
+        group = await client.groups.get(
+            group_id=data[CONF_GROUP_ID], include_users=False
+        )
+        return group
 
 
 class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -73,11 +77,12 @@ class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
             reauth_entry = self._get_reauth_entry()
             test_data = {**reauth_entry.data, **user_input}
 
-            errors = await self._async_validate_or_error(test_data)
+            errors, group = await self._async_validate_or_error(test_data)
 
-            if not errors:
+            if not errors and group:
                 return self.async_update_reload_and_abort(
                     reauth_entry,
+                    title=f"Eetlijst {group.name}",
                     data={
                         **reauth_entry.data,
                         CONF_API_TOKEN: user_input[CONF_API_TOKEN],
@@ -103,11 +108,11 @@ class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(user_input[CONF_GROUP_ID])
             self._abort_if_unique_id_configured()
 
-            errors = await self._async_validate_or_error(user_input)
+            errors, group = await self._async_validate_or_error(user_input)
 
-            if not errors:
+            if not errors and group:
                 return self.async_create_entry(
-                    title=f"Eetlijst ({user_input[CONF_GROUP_ID]})",
+                    title=f"Eetlijst {group.name}",
                     data=user_input,
                 )
 
@@ -117,12 +122,15 @@ class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _async_validate_or_error(self, config: dict[str, Any]) -> dict[str, str]:
+    async def _async_validate_or_error(
+        self, config: dict[str, Any]
+    ) -> tuple[dict[str, str], GroupResult | None]:
         """Validate configuration and return any error keys."""
         errors: dict[str, str] = {}
+        group: GroupResult | None = None
 
         try:
-            await _validate_input(self.hass, config)
+            group = await _validate_input(self.hass, config)
         except httpx.HTTPStatusError as err:
             if err.response.status_code in (401, 403):
                 errors["base"] = "invalid_auth"
@@ -136,4 +144,4 @@ class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("Unexpected exception validating Eetlijst connection")
             errors["base"] = "unknown"
 
-        return errors
+        return (errors, group)
