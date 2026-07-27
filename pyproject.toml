@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "home-assistant-integrations"
+version = "0.0.1"
+requires-python = ">=3.14"
+dependencies = [
+    "homeassistant"
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy",
+    "black",
+    "isort",
+    "pylint",
+    "types-setuptools",
+]
+
+[tool.pylint.messages_control]
+disable = [
+    "abstract-method", # Pylint has a lot of false positives in homeassistant
+]
+
+[tool.mypy]
+python_version = "3.14"
+show_error_codes = true
+follow_imports = "silent"
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
+
+[tool.black]
+target-version = ['py314']
+
+[tool.isort]
+profile = "black"
+py_version = 314

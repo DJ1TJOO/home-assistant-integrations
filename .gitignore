@@ -1,0 +1,11 @@
+﻿*.pyc
+__pycache__/
+.DS_Store
+.vscode/
+
+# Build & Tool Caches
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.venv/
