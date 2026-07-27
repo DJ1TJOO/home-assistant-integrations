@@ -3,7 +3,12 @@
 from homeassistant.const import Platform
 
 DOMAIN = "eetlijst"
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CALENDAR, Platform.TODO]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.CALENDAR,
+    Platform.TODO,
+    Platform.BUTTON,
+]
 
 # Config
 CONF_GROUP_ID = "group_id"
