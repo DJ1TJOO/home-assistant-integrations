@@ -2,7 +2,7 @@
 
 from typing import TypedDict
 
-from eetlijst_py.generated import AttendanceStatus
+from eetlijst_py.services.event_attendance.transformers import AttendanceStatus
 from eetlijst_py.services.events.transformers import Event
 from homeassistant.util import dt as dt_util
 
@@ -62,14 +62,14 @@ def parse_attendance_info(event: Event) -> AttendanceSummary:
         status = attendee.status
 
         # Categorize cooks and grocery buyers
-        if status == AttendanceStatus.cook:
+        if status == AttendanceStatus.COOK:
             cooks.append(username)
 
-        if status == AttendanceStatus.got_groceries:
+        if status == AttendanceStatus.GOT_GROCERIES:
             grocery_buyers.append(username)
 
         # Include everyone who is attending (cook, eat_only, got_groceries)
-        if status != AttendanceStatus.not_attending:
+        if status != AttendanceStatus.NOT_ATTENDING:
             attendee_names.append(username)
             eating_members.append(
                 {
