@@ -1,6 +1,5 @@
 """Sensor platform for Eetlijst integration."""
 
-import logging
 from typing import Any
 
 from eetlijst_py.services.events.transformers import Event
@@ -11,8 +10,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .coordinator import EetlijstConfigEntry, EetlijstCoordinator
 from .device import EetlijstBaseEntity
 from .helpers import get_today_event, parse_attendance_info
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -29,7 +26,6 @@ async def async_setup_entry(
         EetlijstEventTodaySensor(coordinator, group_id),
     ]
 
-    _LOGGER.warning("Coordinator data %s", coordinator.data)
     # Dynamically instantiate member sensors for each user in the group
     if coordinator.data and coordinator.data.group and coordinator.data.group.users:
         for user in coordinator.data.group.users:
