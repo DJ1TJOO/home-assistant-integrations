@@ -8,7 +8,7 @@ from typing import Any, override
 import httpx
 import voluptuous as vol
 from eetlijst_py import Eetlijst
-from eetlijst_py.services.groups.transformers import GroupResult
+from eetlijst_py.services.groups.types import Group
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_API_TOKEN
 from homeassistant.core import HomeAssistant
@@ -41,7 +41,7 @@ DATA_SCHEMA = vol.Schema(
 async def _validate_input(
     hass: HomeAssistant,
     data: dict[str, Any],
-) -> GroupResult:
+) -> Group:
     """Validate user input allows us to connect and return the group object."""
     client = Eetlijst(
         api_key=data[CONF_API_TOKEN],
@@ -124,10 +124,10 @@ class EetlijstConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _async_validate_or_error(
         self, config: dict[str, Any]
-    ) -> tuple[dict[str, str], GroupResult | None]:
+    ) -> tuple[dict[str, str], Group | None]:
         """Validate configuration and return any error keys."""
         errors: dict[str, str] = {}
-        group: GroupResult | None = None
+        group: Group | None = None
 
         try:
             group = await _validate_input(self.hass, config)

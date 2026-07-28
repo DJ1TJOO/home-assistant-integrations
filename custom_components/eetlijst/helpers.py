@@ -3,8 +3,8 @@
 from datetime import datetime, timezone
 from typing import Any, TypedDict
 
-from eetlijst_py.services.event_attendance.types import AttendanceStatus
-from eetlijst_py.services.events.types import Attendance, Event
+from eetlijst_py.services.event_attendance.types import Attendance, AttendanceStatus
+from eetlijst_py.services.events.types import Event
 from eetlijst_py.services.group_users.types import UserInGroup
 from eetlijst_py.services.groups.types import Group
 from eetlijst_py.services.users.types import User
@@ -283,21 +283,21 @@ def convert_attendance_to_dict(
         event_id = attendance.event.id
         event_name = attendance.event.name
 
-    return {
-        "user_id": user_id,
-        "username": username,
-        "event_id": event_id,
-        "event_name": event_name,
-        "status": attendance.status.value,
-        "number_guests": attendance.number_guests,
-        "comment": attendance.comment,
-        "created_at": (
+    return AttendanceDict(
+        user_id=user_id,
+        username=username,
+        event_id=event_id,
+        event_name=event_name,
+        status=attendance.status.value,
+        number_guests=attendance.number_guests,
+        comment=attendance.comment,
+        created_at=(
             attendance.created_at.isoformat() if attendance.created_at else None
         ),
-        "updated_at": (
+        updated_at=(
             attendance.updated_at.isoformat() if attendance.updated_at else None
         ),
-    }
+    )
 
 
 def convert_event_to_dict(event: Event | None) -> EventDict:

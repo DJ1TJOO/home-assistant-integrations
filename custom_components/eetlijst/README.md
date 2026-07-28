@@ -25,8 +25,16 @@ This integration is configured entirely via the Home Assistant User Interface.
 
 Before setting up the integration, make sure you have:
 
-1. Your **API Token** for Eetlijst.
-2. Your **Group ID**.
+#### API Token
+
+1. Log in to your [Eetlijst Account](https://v5.eetlijst.nl/account).
+2. Scroll down to the **Developer API key (BETA)** section.
+3. Copy your API token.
+
+#### Group ID
+
+1. Open your group on [Eetlijst](https://v5.eetlijst.nl).
+2. From the url copy the group id `https://v5.eetlijst.nl/groups/group/<group_id>/`
 
 ### Setup Steps
 

@@ -2,8 +2,9 @@
 
 from typing import Any
 
-from eetlijst_py.services.events.transformers import Attendance, Event
-from eetlijst_py.services.groups.transformers import AttendanceStatus, UserInGroupResult
+from eetlijst_py.services.event_attendance.types import Attendance, AttendanceStatus
+from eetlijst_py.services.events.types import Event
+from eetlijst_py.services.group_users.types import UserInGroup
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -106,7 +107,7 @@ class EetlijstMemberSensor(EetlijstBaseEntity, SensorEntity):
     """Sensor representing an individual group member's status for today's event."""
 
     def __init__(
-        self, coordinator: EetlijstCoordinator, group_id: str, user: UserInGroupResult
+        self, coordinator: EetlijstCoordinator, group_id: str, user: UserInGroup
     ) -> None:
         """Initialize member sensor."""
         super().__init__(coordinator, group_id)
@@ -115,7 +116,7 @@ class EetlijstMemberSensor(EetlijstBaseEntity, SensorEntity):
         self._attr_unique_id = f"eetlijst_{group_id}_member_{self._user_id}"
 
     @property
-    def group_user(self) -> UserInGroupResult | None:
+    def group_user(self) -> UserInGroup | None:
         """Dynamically fetch latest member data from coordinator."""
         if not self.coordinator.data or not self.coordinator.data.group:
             return None
