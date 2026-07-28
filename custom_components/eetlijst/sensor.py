@@ -29,7 +29,7 @@ async def async_setup_entry(
         EetlijstEventTodaySensor(coordinator, group_id),
     ]
 
-    _LOGGER.info("Coordinator data %s", coordinator.data)
+    _LOGGER.warning("Coordinator data %s", coordinator.data)
     # Dynamically instantiate member sensors for each user in the group
     if coordinator.data and coordinator.data.group and coordinator.data.group.users:
         for user in coordinator.data.group.users:
