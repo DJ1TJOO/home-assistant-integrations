@@ -20,14 +20,14 @@ class AttendeeDetail(TypedDict):
 class AttendanceSummary(TypedDict):
     """Structured attendance summary for an event."""
 
-    total_attendees: int
+    attending_count: int
     member_count: int
     guest_count: int
     has_cook: bool
     cooks: list[str]
     grocery_buyers: list[str]
     attendees: list[AttendeeDetail]
-    attendee_names: list[str]
+    attending_names: list[str]
 
 
 def get_today_event(events: list[Event] | None) -> Event | None:
@@ -44,14 +44,12 @@ def get_today_event(events: list[Event] | None) -> Event | None:
 
 def parse_attendance_info(event: Event) -> AttendanceSummary:
     """Extract structured attendance attributes from a typed Event."""
-    attendees = event.attendees or []
-
-    eating_members: list[AttendeeDetail] = []
+    attendees: list[AttendeeDetail] = []
     cooks: list[str] = []
     grocery_buyers: list[str] = []
-    attendee_names: list[str] = []
+    attending_names: list[str] = []
 
-    for attendee in attendees:
+    for attendee in event.attendees or []:
         # Extract user_id and username from the nested user model
         username = "Unknown"
         user_id = None
@@ -69,29 +67,34 @@ def parse_attendance_info(event: Event) -> AttendanceSummary:
             grocery_buyers.append(username)
 
         # Include everyone who is attending (cook, eat_only, got_groceries)
-        if status != AttendanceStatus.NOT_ATTENDING:
-            attendee_names.append(username)
-            eating_members.append(
-                {
-                    "user_id": user_id,
-                    "username": username,
-                    "status": status.value,
-                    "number_guests": attendee.number_guests,
-                    "comment": attendee.comment,
-                }
-            )
+        if status not in (
+            AttendanceStatus.NOT_ATTENDING,
+            AttendanceStatus.DONT_KNOW_YET,
+        ):
+            attending_names.append(username)
 
-    total_guests = sum(a["number_guests"] for a in eating_members)
+        attendees.append(
+            {
+                "user_id": user_id,
+                "username": username,
+                "status": status.value,
+                "number_guests": attendee.number_guests,
+                "comment": attendee.comment,
+            }
+        )
+
+    attending_count = len(attending_names)
+    guests_count = sum(a["number_guests"] for a in attendees)
 
     return {
-        "total_attendees": len(eating_members) + total_guests,
-        "member_count": len(eating_members),
-        "guest_count": total_guests,
+        "attending_count": attending_count + guests_count,
+        "member_count": attending_count,
+        "guest_count": guests_count,
         "has_cook": len(cooks) > 0,
+        "attending_names": attending_names,
         "cooks": cooks,
         "grocery_buyers": grocery_buyers,
-        "attendees": eating_members,
-        "attendee_names": attendee_names,
+        "attendees": attendees,
     }
 
 

@@ -68,7 +68,7 @@ class EetlijstCalendarEntity(EetlijstBaseEntity, CalendarEntity):
 
         cook_str = ", ".join(att_info["cooks"]) if att_info["has_cook"] else "No"
         summary_lines = [
-            f"Total Attendees: {att_info['total_attendees']}",
+            f"Total Attendees: {att_info['attending_count']}",
             f"Cook assigned: {cook_str}",
             "\nAttendees:",
         ]

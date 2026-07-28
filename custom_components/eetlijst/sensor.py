@@ -106,7 +106,7 @@ class EetlijstEventTodaySensor(EetlijstBaseEntity, SensorEntity):
         event = self._today_event
         if not event:
             return 0
-        return parse_attendance_info(event)["total_attendees"]
+        return parse_attendance_info(event)["attending_count"]
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
