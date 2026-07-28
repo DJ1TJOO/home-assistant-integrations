@@ -3,16 +3,11 @@
 from datetime import datetime, timezone
 from typing import Any, TypedDict
 
-from eetlijst_py.services.event_attendance.transformers import (
-    Attendance,
-    AttendanceStatus,
-)
-from eetlijst_py.services.events.transformers import Event
-from eetlijst_py.services.groups.transformers import (
-    GroupResult,
-    UserInGroupResult,
-    UserResult,
-)
+from eetlijst_py.services.event_attendance.types import AttendanceStatus
+from eetlijst_py.services.events.types import Attendance, Event
+from eetlijst_py.services.group_users.types import UserInGroup
+from eetlijst_py.services.groups.types import Group
+from eetlijst_py.services.users.types import User
 from homeassistant.util import dt as dt_util
 
 # ==========================================
@@ -121,7 +116,7 @@ class EventDict(AttendanceSummary):
 # ==========================================
 
 
-def parse_default_schedule(group_user: UserInGroupResult | None) -> DefaultScheduleDict:
+def parse_default_schedule(group_user: UserInGroup | None) -> DefaultScheduleDict:
     """Parse weekly attendance schedule into a TypedDict of string status values."""
     if not group_user:
         return {
@@ -145,7 +140,7 @@ def parse_default_schedule(group_user: UserInGroupResult | None) -> DefaultSched
     }
 
 
-def is_user_on_holiday(group_user: UserInGroupResult | None) -> bool:
+def is_user_on_holiday(group_user: UserInGroup | None) -> bool:
     """Determine whether a group user is currently on holiday."""
     if not group_user or not group_user.start_holliday or not group_user.end_holliday:
         return False
@@ -166,9 +161,9 @@ def is_user_on_holiday(group_user: UserInGroupResult | None) -> bool:
 
 
 def convert_user_in_group_to_dict(
-    group_user: UserInGroupResult | None,
+    group_user: UserInGroup | None,
 ) -> GroupUserDict:
-    """Convert a UserInGroupResult domain model into a typed dictionary."""
+    """Convert a UserInGroup domain model into a typed dictionary."""
     if not group_user:
         return {
             "active": None,
@@ -193,8 +188,8 @@ def convert_user_in_group_to_dict(
     }
 
 
-def convert_user_to_dict(user: UserResult | None) -> UserDict:
-    """Convert a UserResult domain model into a typed dictionary."""
+def convert_user_to_dict(user: User | None) -> UserDict:
+    """Convert a User domain model into a typed dictionary."""
     if not user:
         return {
             "id": None,
@@ -233,8 +228,8 @@ def convert_user_to_dict(user: UserResult | None) -> UserDict:
     }
 
 
-def convert_group_to_dict(group: GroupResult | None) -> GroupDict:
-    """Convert a GroupResult metadata object into a typed dictionary."""
+def convert_group_to_dict(group: Group | None) -> GroupDict:
+    """Convert a Group metadata object into a typed dictionary."""
     if not group:
         return {
             "id": None,

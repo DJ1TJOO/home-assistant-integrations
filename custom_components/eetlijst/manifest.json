@@ -7,7 +7,7 @@
   "config_flow": true,
   "documentation": "https://github.com/DJ1TJOO/home-assistant-integrations/tree/main/custom_components/eetlijst",
   "requirements": [
-    "eetlijst-python>=0.0.14"
+    "eetlijst-python>=0.0.15"
   ],
   "version": "0.0.1"
 }

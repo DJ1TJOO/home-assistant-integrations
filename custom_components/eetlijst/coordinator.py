@@ -8,14 +8,10 @@ from typing import override
 
 import httpx
 from eetlijst_py import Eetlijst
-from eetlijst_py.generated import (
-    ItemFields,
-    eetschema_event_bool_exp,
-    eetschema_list_bool_exp,
-    timestamptz_comparison_exp,
-)
-from eetlijst_py.services.events.transformers import Event
-from eetlijst_py.services.groups.transformers import GroupResult
+from eetlijst_py.generated import timestamptz_comparison_exp
+from eetlijst_py.services.events.types import Event, WhereEvent
+from eetlijst_py.services.group_list.types import ListItem, WhereListItem
+from eetlijst_py.services.groups.types import Group
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_TOKEN
 from homeassistant.core import HomeAssistant
@@ -43,9 +39,9 @@ type EetlijstConfigEntry = ConfigEntry[EetlijstCoordinator]
 class EetlijstData:
     """Dataclass storing all fetched data for an Eetlijst group."""
 
-    group: GroupResult
+    group: Group
     events: list[Event]
-    shopping_items: list[ItemFields]
+    shopping_items: list[ListItem]
 
 
 class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
@@ -70,17 +66,34 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
 
     @override
     async def _async_setup(self) -> None:
-        """Set up the coordinator and API client."""
+        """Set up the coordinator, API client, and real-time subscriptions."""
         self.client = Eetlijst(
             api_key=self.config_entry.data[CONF_API_TOKEN],
             http_client=get_async_client(self.hass),
         )
 
-    @override
-    async def _async_update_data(self) -> EetlijstData:
-        """Fetch group info, events, and shopping list items."""
-        group_id: str = self.config_entry.data[CONF_GROUP_ID]
+        # Spawn background subscription tasks managed by HA entry lifecycle
+        self.config_entry.async_create_background_task(
+            self.hass,
+            self._listen_group_subscription(),
+            "eetlijst_group_subscription",
+        )
+        self.config_entry.async_create_background_task(
+            self.hass,
+            self._listen_events_subscription(),
+            "eetlijst_events_subscription",
+        )
+        self.config_entry.async_create_background_task(
+            self.hass,
+            self._listen_items_subscription(),
+            "eetlijst_items_subscription",
+        )
 
+    def _get_event_filter_and_limit(
+        self,
+    ) -> tuple[str, WhereEvent | None, int | None]:
+        """Helper to compute filtering parameters from entry config/options."""
+        group_id: str = self.config_entry.data[CONF_GROUP_ID]
         previous_days: int = self.config_entry.options.get(
             CONF_PREVIOUS_DAYS,
             self.config_entry.data.get(CONF_PREVIOUS_DAYS, DEFAULT_PREVIOUS_DAYS),
@@ -93,17 +106,98 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
         if limit is not None and limit <= 0:
             limit = None
 
-        where_filter: eetschema_event_bool_exp | None = None
+        where_filter: WhereEvent | None = None
         if previous_days > 0:
             since_date = dt_util.now() - timedelta(days=previous_days)
-            where_filter = eetschema_event_bool_exp(
+            where_filter = WhereEvent(
                 start_date=timestamptz_comparison_exp(gte=since_date)
             )
 
+        return group_id, where_filter, limit
+
+    async def _listen_group_subscription(self) -> None:
+        """Listen to real-time group updates."""
+        group_id = self.config_entry.data[CONF_GROUP_ID]
+        while True:
+            try:
+                async for group in self.client.groups.get_subscription(
+                    group_id=group_id,
+                    include_users=True,
+                ):
+                    if self.data is not None:
+                        self.async_set_updated_data(
+                            EetlijstData(
+                                group=group,
+                                events=self.data.events,
+                                shopping_items=self.data.shopping_items,
+                            )
+                        )
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                _LOGGER.warning(
+                    "Group subscription stream interrupted (%s). Reconnecting in 5s...",
+                    err,
+                )
+                await asyncio.sleep(5)
+
+    async def _listen_events_subscription(self) -> None:
+        """Listen to real-time event updates."""
+        while True:
+            try:
+                group_id, where_filter, limit = self._get_event_filter_and_limit()
+                async for events in self.client.events.all_subscription(
+                    group_id,
+                    where=where_filter,
+                    limit=limit,
+                    include_attendees=True,
+                ):
+                    if self.data is not None:
+                        self.async_set_updated_data(
+                            EetlijstData(
+                                group=self.data.group,
+                                events=events,
+                                shopping_items=self.data.shopping_items,
+                            )
+                        )
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                _LOGGER.warning(
+                    "Events subscription stream interrupted (%s). Reconnecting in 5s...",
+                    err,
+                )
+                await asyncio.sleep(5)
+
+    async def _listen_items_subscription(self) -> None:
+        """Listen to real-time shopping list updates."""
+        group_id = self.config_entry.data[CONF_GROUP_ID]
+        where_filter = WhereListItem(active={"_eq": True})
+        while True:
+            try:
+                async for items in self.client.groups.list.items_subscription(
+                    group_id=group_id,
+                    where=where_filter,
+                ):
+                    if self.data is not None:
+                        self.async_set_updated_data(
+                            EetlijstData(
+                                group=self.data.group,
+                                events=self.data.events,
+                                shopping_items=items,
+                            )
+                        )
+            except Exception as err:  # pylint: disable=broad-exception-caught
+                _LOGGER.warning(
+                    "Shopping items subscription stream interrupted (%s). Reconnecting in 5s...",
+                    err,
+                )
+                await asyncio.sleep(5)
+
+    @override
+    async def _async_update_data(self) -> EetlijstData:
+        """Fetch group info, events, and shopping list items via REST/GraphQL polling sync."""
+        group_id, where_filter, limit = self._get_event_filter_and_limit()
+
         _LOGGER.debug(
-            "Fetching Eetlijst data for group %s (previous_days=%s, limit=%s)",
+            "Fetching Eetlijst sync data for group %s (limit=%s)",
             group_id,
-            previous_days,
             limit,
         )
 
@@ -119,7 +213,7 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
                     ),
                     self.client.groups.list.items(
                         group_id=group_id,
-                        where=eetschema_list_bool_exp(active={"_eq": True}),
+                        where=WhereListItem(active={"_eq": True}),
                     ),
                 )
 
