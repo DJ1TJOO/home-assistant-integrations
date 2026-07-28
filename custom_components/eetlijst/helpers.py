@@ -368,6 +368,7 @@ def parse_attendance_info(event: Event) -> AttendanceSummary:
     cooks: list[str] = []
     grocery_buyers: list[str] = []
     attending_names: list[str] = []
+    guest_count = 0
 
     for attendee in event.attendees or []:
         att_dict = convert_attendance_to_dict(attendee)
@@ -388,11 +389,11 @@ def parse_attendance_info(event: Event) -> AttendanceSummary:
             AttendanceStatus.DONT_KNOW_YET,
         ):
             attending_names.append(username)
+            guest_count += att_dict.get("number_guests", 0)
 
         attendees.append(att_dict)
 
     attending_count = len(attending_names)
-    guest_count = sum(a["number_guests"] for a in attendees)
 
     return {
         "attending_count": attending_count + guest_count,
