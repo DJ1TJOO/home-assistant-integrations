@@ -67,6 +67,10 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
     @override
     async def _async_setup(self) -> None:
         """Set up the coordinator, API client, and real-time subscriptions."""
+        _LOGGER.debug(
+            "Setting up Eetlijst WebSocket client and tasks for entry %s",
+            self.config_entry.entry_id,
+        )
         self.client = Eetlijst(
             api_key=self.config_entry.data[CONF_API_TOKEN],
             http_client=get_async_client(self.hass),
@@ -118,12 +122,15 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
     async def _listen_group_subscription(self) -> None:
         """Listen to real-time group updates."""
         group_id = self.config_entry.data[CONF_GROUP_ID]
+        _LOGGER.debug("Starting WS group subscription for group %s", group_id)
+
         while True:
             try:
                 async for group in self.client.groups.get_subscription(
                     group_id=group_id,
                     include_users=True,
                 ):
+                    _LOGGER.debug("WS group payload received for group %s", group_id)
                     if self.data is not None:
                         self.async_set_updated_data(
                             EetlijstData(
@@ -132,24 +139,39 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
                                 shopping_items=self.data.shopping_items,
                             )
                         )
+                    else:
+                        _LOGGER.debug(
+                            "WS group update skipped: self.data is uninitialized"
+                        )
             except Exception as err:  # pylint: disable=broad-exception-caught
                 _LOGGER.warning(
-                    "Group subscription stream interrupted (%s). Reconnecting in 5s...",
+                    "WS group stream interrupted (%s). Reconnecting in 5s...",
                     err,
+                    exc_info=True,
                 )
                 await asyncio.sleep(5)
 
     async def _listen_events_subscription(self) -> None:
         """Listen to real-time event updates."""
+        _LOGGER.debug("Starting WS events subscription task")
         while True:
             try:
                 group_id, where_filter, limit = self._get_event_filter_and_limit()
+                _LOGGER.debug(
+                    "Subscribing to WS events (group=%s, limit=%s)",
+                    group_id,
+                    limit,
+                )
                 async for events in self.client.events.all_subscription(
                     group_id,
                     where=where_filter,
                     limit=limit,
                     include_attendees=True,
                 ):
+                    _LOGGER.debug(
+                        "WS events payload received (%d event(s))",
+                        len(events),
+                    )
                     if self.data is not None:
                         self.async_set_updated_data(
                             EetlijstData(
@@ -158,10 +180,15 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
                                 shopping_items=self.data.shopping_items,
                             )
                         )
+                    else:
+                        _LOGGER.debug(
+                            "WS events update skipped: self.data is uninitialized"
+                        )
             except Exception as err:  # pylint: disable=broad-exception-caught
                 _LOGGER.warning(
-                    "Events subscription stream interrupted (%s). Reconnecting in 5s...",
+                    "WS events stream interrupted (%s). Reconnecting in 5s...",
                     err,
+                    exc_info=True,
                 )
                 await asyncio.sleep(5)
 
@@ -169,12 +196,18 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
         """Listen to real-time shopping list updates."""
         group_id = self.config_entry.data[CONF_GROUP_ID]
         where_filter = WhereListItem(active={"_eq": True})
+        _LOGGER.debug("Starting WS items subscription for group %s", group_id)
+
         while True:
             try:
                 async for items in self.client.groups.list.items_subscription(
                     group_id=group_id,
                     where=where_filter,
                 ):
+                    _LOGGER.debug(
+                        "WS shopping items payload received (%d item(s))",
+                        len(items),
+                    )
                     if self.data is not None:
                         self.async_set_updated_data(
                             EetlijstData(
@@ -183,10 +216,15 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
                                 shopping_items=items,
                             )
                         )
+                    else:
+                        _LOGGER.debug(
+                            "WS items update skipped: self.data is uninitialized"
+                        )
             except Exception as err:  # pylint: disable=broad-exception-caught
                 _LOGGER.warning(
-                    "Shopping items subscription stream interrupted (%s). Reconnecting in 5s...",
+                    "WS items stream interrupted (%s). Reconnecting in 5s...",
                     err,
+                    exc_info=True,
                 )
                 await asyncio.sleep(5)
 
@@ -194,12 +232,6 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
     async def _async_update_data(self) -> EetlijstData:
         """Fetch group info, events, and shopping list items via REST/GraphQL polling sync."""
         group_id, where_filter, limit = self._get_event_filter_and_limit()
-
-        _LOGGER.debug(
-            "Fetching Eetlijst sync data for group %s (limit=%s)",
-            group_id,
-            limit,
-        )
 
         try:
             async with asyncio.timeout(15):
