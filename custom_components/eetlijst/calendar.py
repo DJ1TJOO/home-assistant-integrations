@@ -76,9 +76,9 @@ class EetlijstCalendarEntity(EetlijstBaseEntity, CalendarEntity):
         for att in att_info["attendees"]:
             guests = f" (+{att['number_guests']})" if att["number_guests"] > 0 else ""
             comment = f" - '{att['comment']}'" if att["comment"] else ""
-            summary_lines.append(
-                f"• {att['username']}{guests} [{att['status']}]{comment}"
-            )
+            username = att["username"] or "Unknown"
+
+            summary_lines.append(f"• {username}{guests} [{att['status']}]{comment}")
 
         base_desc = event.description or ""
         description = f"{base_desc}\n\n" if base_desc else ""

@@ -80,7 +80,7 @@ class EetlijstTodoListEntity(EetlijstBaseEntity, TodoListEntity):
         checked = item.status == TodoItemStatus.COMPLETED
         await self.coordinator.client.groups.list.check_item(
             item_id=item.uid,
-            check=checked,
+            state=checked,
         )
         await self.coordinator.async_request_refresh()
 

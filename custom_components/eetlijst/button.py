@@ -1,3 +1,5 @@
+"""Button platform for Eetlijst integration."""
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback

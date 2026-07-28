@@ -2,14 +2,25 @@
 
 from typing import Any
 
-from eetlijst_py.services.events.transformers import Event
+from eetlijst_py.services.events.transformers import Attendance, Event
+from eetlijst_py.services.groups.transformers import AttendanceStatus, UserInGroupResult
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .coordinator import EetlijstConfigEntry, EetlijstCoordinator
 from .device import EetlijstBaseEntity
-from .helpers import get_today_event, parse_attendance_info
+from .helpers import (
+    EventDict,
+    GroupDict,
+    convert_attendance_to_dict,
+    convert_event_to_dict,
+    convert_group_to_dict,
+    convert_user_in_group_to_dict,
+    convert_user_to_dict,
+    get_today_event,
+    parse_attendance_info,
+)
 
 
 async def async_setup_entry(
@@ -53,33 +64,10 @@ class EetlijstGroupSensor(EetlijstBaseEntity, SensorEntity):
         return None
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any]:
+    def extra_state_attributes(self) -> GroupDict:
         """Return group extra attributes."""
-        if not (self.coordinator.data and self.coordinator.data.group):
-            return {}
-
-        group = self.coordinator.data.group
-        return {
-            "id": group.id,
-            "description": group.description,
-            "default_close_time": group.default_close_time,
-            "created_at": group.created_at.isoformat() if group.created_at else None,
-            "created_at_eetlijst": (
-                group.created_at_eetlijst.isoformat()
-                if getattr(group, "created_at_eetlijst", None)
-                else None
-            ),
-            "statistics_start_date": (
-                group.statistics_start_date.isoformat()
-                if group.statistics_start_date
-                else None
-            ),
-            "statistics_end_date": (
-                group.statistics_end_date.isoformat()
-                if group.statistics_end_date
-                else None
-            ),
-        }
+        group = self.coordinator.data.group if self.coordinator.data else None
+        return convert_group_to_dict(group)
 
 
 class EetlijstEventTodaySensor(EetlijstBaseEntity, SensorEntity):
@@ -109,93 +97,100 @@ class EetlijstEventTodaySensor(EetlijstBaseEntity, SensorEntity):
         return parse_attendance_info(event)["attending_count"]
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any]:
+    def extra_state_attributes(self) -> EventDict:
         """Return event details and formatted attendee list."""
-        event = self._today_event
-        if not event:
-            return {"has_event": False, "attendees": []}
-
-        return {
-            "has_event": True,
-            "event_id": str(event.id),
-            "name": event.name,
-            "description": event.description,
-            "open": event.open,
-            "start_date": event.start_date.isoformat(),
-            "signup_deadline": (
-                event.signup_deadline.isoformat() if event.signup_deadline else None
-            ),
-            "closed_by": event.closed_by,
-            "changed_signup_time": (
-                event.changed_signup_time.isoformat()
-                if getattr(event, "changed_signup_time", None)
-                else None
-            ),
-            "created_at": event.created_at.isoformat() if event.created_at else None,
-            "updated_at": (
-                event.updated_at.isoformat()
-                if getattr(event, "updated_at", None)
-                else None
-            ),
-            **parse_attendance_info(event),
-        }
+        return convert_event_to_dict(self._today_event)
 
 
 class EetlijstMemberSensor(EetlijstBaseEntity, SensorEntity):
     """Sensor representing an individual group member's status for today's event."""
 
     def __init__(
-        self, coordinator: EetlijstCoordinator, group_id: str, user: Any
+        self, coordinator: EetlijstCoordinator, group_id: str, user: UserInGroupResult
     ) -> None:
         """Initialize member sensor."""
         super().__init__(coordinator, group_id)
-        self._user = user
-        self._attr_name = user.name
-        self._attr_unique_id = f"eetlijst_{group_id}_member_{user.id}"
+        self._user_id = user.user.id
+        self._attr_name = user.user.name
+        self._attr_unique_id = f"eetlijst_{group_id}_member_{self._user_id}"
 
     @property
-    def _today_attendance(self) -> Any | None:
-        """Cross-reference member ID with today's event attendees."""
-        event = get_today_event(
-            self.coordinator.data.events if self.coordinator.data else None
-        )
-        if not event or not event.attendees:
+    def group_user(self) -> UserInGroupResult | None:
+        """Dynamically fetch latest member data from coordinator."""
+        if not self.coordinator.data or not self.coordinator.data.group:
             return None
 
-        for att in event.attendees:
-            att_id = att.user.id if att.user else None
-            att_user_id = att.user.user.id if (att.user and att.user.user) else None
-            if att_id == self._user.id or att_user_id == self._user.id:
-                return att
+        for group_user_item in self.coordinator.data.group.users:
+            if group_user_item.user.id == self._user_id:
+                return group_user_item
+
         return None
 
     @property
-    def native_value(self) -> str:
-        """Return attendance status string or UNSET."""
-        att = self._today_attendance
-        if att is None:
-            return "UNSET"
-        status = att.status.value if hasattr(att.status, "value") else str(att.status)
-        return str(status).upper()
+    def entity_picture(self) -> str | None:
+        """Return user avatar for UI cards when available."""
+        group_user = self.group_user
+        if not group_user:
+            return None
+
+        return group_user.user.profile_image_url
+
+    @property
+    def _today_attendance(self) -> Attendance | None:
+        """Cross-reference member ID with today's event attendees."""
+        if not self.coordinator.data:
+            return None
+
+        event = get_today_event(self.coordinator.data.events)
+        if not event or not event.attendees:
+            return None
+
+        for attendee in event.attendees:
+            if attendee.user and attendee.user.user.id == self._user_id:
+                return attendee
+
+        return None
+
+    @property
+    def native_value(self) -> str | None:
+        """Return attendance status string or None."""
+        attendance = self._today_attendance
+        return attendance.status.value if attendance else None
 
     @property
     def icon(self) -> str:
         """Dynamic icon based on status."""
         status = self.native_value
-        if status in ("EATING", "COOK", "GOT_GROCERIES", "EAT_ONLY"):
-            return "mdi:silverware-fork-knife"
-        if status in ("NOT_EATING", "NOT_ATTENDING"):
-            return "mdi:close-circle-outline"
-        return "mdi:help-circle-outline"
+        match status:
+            case (
+                AttendanceStatus.COOK.value
+                | AttendanceStatus.GOT_GROCERIES.value
+                | AttendanceStatus.EAT_ONLY.value
+            ):
+                return "mdi:silverware-fork-knife"
+
+            case AttendanceStatus.NOT_ATTENDING.value:
+                return "mdi:close-circle-outline"
+
+            case AttendanceStatus.DONT_KNOW_YET.value | None:
+                return "mdi:help-circle-outline"
+
+            case _:
+                return "mdi:account-outline"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra user attendance attributes."""
-        att = self._today_attendance
+        """Return detailed user profile, preferences, and event status."""
+        group_user = self.group_user
+        user = group_user.user if group_user else None
+
+        user_dict = convert_user_to_dict(user)
+        if not user:
+            user_dict["id"] = self._user_id
+            user_dict["name"] = self._attr_name
+
         return {
-            "user_id": self._user.id,
-            "name": self._user.name,
-            "number_guests": att.number_guests if att else 0,
-            "comment": att.comment if att else None,
-            "order": getattr(self._user, "order", None),
+            "today_attendance": convert_attendance_to_dict(self._today_attendance),
+            **user_dict,
+            "group_user": convert_user_in_group_to_dict(group_user),
         }

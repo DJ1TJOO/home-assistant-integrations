@@ -1,3 +1,5 @@
+"""Device/BaseEntity for Eetlijst integration."""
+
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
