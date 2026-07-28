@@ -139,11 +139,19 @@ class EetlijstCoordinator(DataUpdateCoordinator[EetlijstData]):
                 raise ConfigEntryAuthFailed(
                     "Invalid API token or unauthorized"
                 ) from err
-            raise UpdateFailed(f"HTTP error fetching Eetlijst data: {err}") from err
+
+            status = err.response.status_code
+            body = err.response.text[:200] if err.response else ""
+            raise UpdateFailed(
+                f"HTTP {status} fetching Eetlijst data: {body or str(err) or repr(err)}"
+            ) from err
 
         except httpx.RequestError as err:
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+            raise UpdateFailed(
+                f"Error communicating with API ({type(err).__name__}): {str(err) or repr(err)}"
+            ) from err
 
         except Exception as err:
-            _LOGGER.exception("Unexpected error fetching Eetlijst data")
-            raise UpdateFailed(f"Unexpected error: {err}") from err
+            raise UpdateFailed(
+                f"Unexpected error ({type(err).__name__}): {str(err) or repr(err)}"
+            ) from err

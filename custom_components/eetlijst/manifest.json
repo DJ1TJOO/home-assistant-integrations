@@ -5,7 +5,7 @@
     "@DJ1TJOO"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/DJ1TJOO/home-assistant-integrations/custom_components/eetlijst",
+  "documentation": "https://github.com/DJ1TJOO/home-assistant-integrations/tree/main/custom_components/eetlijst",
   "requirements": [
     "eetlijst-python>=0.0.14"
   ],
